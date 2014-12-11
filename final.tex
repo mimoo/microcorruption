@@ -111,24 +111,22 @@ Some explanations on the desassembly here:
 \end{itemize}
 
 In the function \texttt{check\_password} the program plays with
-registers. Those are just place near the CPU that can be accessed very
+registers. Those are just places near the CPU that can be accessed very
 fast. You can put \textbf{one word} of anything you want in it, be it a
 pointer or a value. A \textbf{word} represents the space in memory you
 can allocate. MSP430 is a 16 bits system so a word is 16 bits.
 
 There are other ways (and slower ways) to store and retrieve data in
-code execution. But we'll only work with register for this second level.
+code execution. But we'll only work with registers for this second level.
 Here's what the code would do if disassembled in a language more
 familiar (that looks like C):
 
 \includegraphics{img/code1_final.PNG}
 
-\begin{quote}
 So we compare one byte of what's in r13 with one byte of what's in
 address r14 + 2400 (which is address 2400 since we did a
 \texttt{clr r14}).\\Then we compare the next byte, and on and on, for 8
 bytes. Then it sets r15 to 1 and return. Otherwise r15 is set to zero.
-\end{quote}
 
 We can see later in the code that if \texttt{r15 = 0} it's a bad thing,
 and if it equals \texttt{1} then we're done!\\At this point we can
@@ -163,7 +161,7 @@ Alright let's look at \texttt{check\_password} shall we?
 
 So \texttt{0x5932} (the \texttt{0x} part means we write in hexadecimal!)
 is getting compared against r15. Since \textbf{MSP430} is 16 bits,
-instructions like \texttt{cmp} compare 16bits by default.\\Then we
+instructions like \texttt{cmp} compare 16 bits by default.\\Then we
 compare \texttt{0x4f63} with \texttt{0x2(r15)} which means the content
 at address r15 + 2 bytes.\\And on and on. Bad comparisons at every step
 makes the program jumps and set r15 to zero which we don't want.
