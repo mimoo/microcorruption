@@ -1,182 +1,171 @@
-\documentclass[a4paper,11pt]{article}
-
-\usepackage{graphicx}
-\usepackage[utf8]{inputenc}
-\usepackage[francais]{babel}
-\usepackage{amsmath}
-\usepackage[T1]{fontenc}
-\usepackage{setspace}
-
-\setstretch{1.3}
-\setlength{\parindent}{0in}
-\baselineskip=30pt
-
-\title{Microcorruption.com Write-up}
-\author{David Wong}
-\date{7 Décembre 2014}
-
-\begin{document}
-
-\maketitle
-
 \section{Level 1: Tutorial}\label{level-1-tutorial}
 
-Just follow the tutorial :)
-
-\section{Level 2: New Orleans}\label{level-2-new-orleans}
-
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/1_1.png}
-\caption{micro corruption}
-\end{figure}
 
 \href{http://microcorruption.com/}{MicroCorruption} is a ``game'' made
 by \textbf{Matasano} in which you will have to debug some programs in
-\textbf{assembly}. There is a total of 19 levels and each one is harder
-and harder. The first levels are made for begginners though! So it seems
-like a great tool to learn.
+\textbf{assembly}. There is a total of 19 levels and they get harder and
+harder, teaching you about more advanced attacks and ways of mitigating
+them. The first levels are easy and there is even a tutorial that takes
+you step by step into this world. It is a great tool to learn and I
+would even say a great game to play. As I had never done any
+\textbf{asm} (assembly) prior to this, I will try to document my journey
+in this challenge.
 
-I didn't know anything about \textbf{asm} (assembly) prior to this so I
-will try to document my journey in this challenge.
+\section{Level 2: New Orleans}\label{level-2-new-orleans}
 
-\textbf{Level 1, New Orleans} is supposed to be easy.
+\includegraphics{img/2_3.png}
 
 MicroCorruption comes with a nice debugger. Writing \texttt{c} (as
 \emph{continue}) in the \textbf{debugger console} runs the program and
 allows you to try a password.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/1_2.png}
-\caption{password}
-\end{figure}
 
-Of course entering \emph{password} doesn't work. let's type
+Of course entering \emph{password} as password doesn't work. let's type
 \texttt{reset} in the console and try again. The debugger creates a
-\textbf{breaking point} automatically after the pop-up.
+\textbf{breaking point} automatically after the pop-up by the way.
 
 After a few \texttt{n} (next instruction) we end up in a
 \texttt{check\_password} function. Obviously it is checking if the
 password is correct. This is where it starts.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/1_3.png}
-\caption{e}
-\end{figure}
 
-Some explanations on the window:
+Some explanations on the desassembly here:
 
 \begin{itemize}
 \item
-  on the left you can see the addresses in the memory of each
-  instructions. They are written in base 16 (1 means 8bits) and each
-  instruction seems to take a different size.
+  On the left you can see the addresses in the memory for each
+  instructions. They take 16 bits of space (so we are not in a 32 or 64
+  bits system) and they are written in base 16 for more conveniance. 1
+  bit in the address maps to 1 byte of code. Also an instruction's size
+  can vary from 1 byte to many bytes.
 \item
-  after this you can see the instruction written in hexadecimal
-  directly. It's not very useful, at least at this level.
+  After the address of the instruction you can see the instruction in
+  hexadecimal (\texttt{0e43} on the first line). It's not very useful,
+  at least at this level.
 \item
-  then you have the instruction that consists of an \textbf{opcode}
-  (\texttt{clr} on the first line) along with its \textbf{arguments}.
+  Following the hexadecimal form of the instruction you have the
+  assembly form of it. Comprised of an \textbf{opcode} (\texttt{clr} on
+  the first line) and its \textbf{arguments} (\texttt{r14} on the first
+  line).
 \end{itemize}
 
-What the function does is basically this:
+In the function \texttt{check\_password} the program plays with
+registers. Those are just place near the CPU that can be accessed very
+fast. You can put \textbf{one word} of anything you want in it, be it a
+pointer or a value. A \textbf{word} represents the space in memory you
+can allocate. MSP430 is a 16 bits system so a word is 16 bits.
 
-\begin{Shaded}
-\begin{Highlighting}[]
-\NormalTok{r14 = }\DecValTok{0}\NormalTok{;}
-\NormalTok{r13 = r15; }\CommentTok{// r13 points to something}
-\NormalTok{r13 += r14; }\CommentTok{// we add r14 to the address in r13}
-\KeywordTok{if}\NormalTok{(*r13 == *(}\BaseNTok{0x2400} \NormalTok{+ r14))\{}
-    \NormalTok{r14++;}
-    \KeywordTok{if}\NormalTok{(r14 != }\DecValTok{8}\NormalTok{)\{}
-        \CommentTok{// go back to the r13 += r14 line}
-    \NormalTok{\}}
-    \KeywordTok{else}\NormalTok{\{}
-        \NormalTok{r15 = }\DecValTok{1}\NormalTok{;}
-        \KeywordTok{return}\NormalTok{;}
-    \NormalTok{\}}
-\NormalTok{\}}
-\KeywordTok{else}\NormalTok{\{}
-    \NormalTok{r15 = }\DecValTok{0}\NormalTok{;}
-    \KeywordTok{return}\NormalTok{;}
-\NormalTok{\}}
-\end{Highlighting}
-\end{Shaded}
+There are other ways (and slower ways) to store and retrieve data in
+code execution. But we'll only work with register for this second level.
+Here's what the code would do if disassembled in a language more
+familiar (that looks like C):
+
+\begin{verbatim}
+function check_password:
+
+r14 = 0; // clr r14
+r13 = r15; // mov r15, r13
+r13 += r14; // add r14, 13
+// cmp.b @r13, 0x2400 and jne #0x44d2
+// we compare only one byte and not an entire word
+if(*r13 & 0x01 == *(0x2400 + r14) & 0x01)
+{
+    r14++; // inc r14
+    // cmp #0x8, r14 and jne #0x44be
+    // here we use cmp and not cmp.b so we compare an entire word (16 bits in MSP430)
+    if(r14 != 8)
+    { 
+        goto check_password + 2; // go back to the mov r13 = r15 line
+    }
+    else
+    {
+        r15 = 1; // mov #0x1, r15
+        return; // ret
+    }
+}
+
+r15 = 0; // clr r15
+return; // ret
+\end{verbatim}
 
 \begin{quote}
-So we compare what's in r13 with what's in address 0x2400.\\Then we
-compare the next byte, and on and on for 7 bytes.
+So we compare one byte of what's in r13 with one byte of what's in
+address r14 + 2400 (which is address 2400 since we did a
+\texttt{clr r14}).\\Then we compare the next byte, and on and on, for 8
+bytes. Then it sets r15 to 1 and return. Otherwise r15 is set to zero.
 \end{quote}
 
 We can see later in the code that if \texttt{r15 = 0} it's a bad thing,
 and if it equals \texttt{1} then we're done!\\At this point we can
 easily guess that what is at the address 0x2400 and of length 7 bytes
-must be the password.
+(followed by the \textbackslash{}0 terminating character) must be the
+password.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics{img/1_4.png}
-\caption{f}
-\end{figure}
+\includegraphics{img/1_6.png}
 
 The live \textbf{memory dump} gives us a string. We enter it as the
 password: it works!\\We couldn't see that without running the program
 because the password was created during runtime, we can see the function
 that does that here:
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/1_5.png}
-\caption{g}
-\end{figure}
 
 \section{Level 3: Sydney}\label{level-3-sydney}
 
-Level 2 here we come!
+\includegraphics{img/3_2.PNG}
 
-Let's quickly check the code, we can spot that it's the same as level 1.
-We have a \texttt{check\_password} function that has to change
+\subsection{Observations}\label{observations}
+
+Let's quickly check the code. We can see that it looks a lot like level
+1. We have a \texttt{check\_password} function that has to change
 \texttt{r15} to something which is not zero.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/2_1.PNG}
-\caption{microcorruption}
-\end{figure}
 
 Alright let's look at \texttt{check\_password} shall we?
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/2_2.PNG}
-\caption{microcorruption}
-\end{figure}
 
 So \texttt{0x5932} (the \texttt{0x} part means we write in hexadecimal!)
-is getting compared against r15. Since \textbf{MSP430} is 16bits,
-instructions like cmp compare 16bits by default.\\Then we compare
-\texttt{0x4f63} with \texttt{0x2(r15)} which means the content at
-address r15 + 2 bytes.\\And on and on. Bad comparisons at every step
+is getting compared against r15. Since \textbf{MSP430} is 16 bits,
+instructions like \texttt{cmp} compare 16bits by default.\\Then we
+compare \texttt{0x4f63} with \texttt{0x2(r15)} which means the content
+at address r15 + 2 bytes.\\And on and on. Bad comparisons at every step
 makes the program jumps and set r15 to zero which we don't want.
 
-Note that there are two different jumps here: * Relative jumps:
-\texttt{jnz \$+0x14} (using the relative instruction located at
-``current instruction + 0x14'') * Absolute jumps: \texttt{jne \#0x44ac}
-(using the absolute address of the instruction ``0x44ac'')
+Note that there are two different jumps here:
 
-Note number 2: * jnz: Jump if not zero. If the previous comparison
-checks it should change some flag to zero and the jnz should not work. *
-jne: Jump if not equal. Same principle.
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  Relative jumps: \texttt{jnz \$+0x14} (using the relative instruction
+  located at ``current instruction + 0x14'')
+\item
+  Absolute jumps: \texttt{jne \#0x44ac} (using the absolute address of
+  the instruction at ``0x44ac'')
+\end{itemize}
+
+Note number 2:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  jnz: Jump if not zero. If the previous comparison checks it should
+  change some flag to zero and the jnz should not work.
+\item
+  jne: Jump if not equal. Same principle.
+\end{itemize}
 
 At this point we could \textbf{guess} that the password is something
-like \emph{0x59324f6347257672}
+like \texttt{0x59324f6347257672}
 
 Well. Curiously this does not work. After a bit of research, maybe we
 are in \href{http://en.wikipedia.org/wiki/Endianness}{little-endian}?
 
-Trying \emph{0x3259634f25477276} it works!
+Trying \texttt{0x3259634f25477276} it works!
 
 Basically what the \texttt{cmp} opcode does is slicing the 2 bytes we
 feed it in chunks of size 1 byte and ordering them accordingly to our
@@ -184,20 +173,20 @@ system's endianness. So here it would be in reverse order.
 
 \section{Level 4: Hanoi}\label{level-4-hanoi}
 
+\includegraphics{img/4_1.PNG}
+
+\subsection{Observations}\label{observations-1}
+
 We know how this works now, let's go straight for the \emph{``That
 password is not correct.''} line. Scrolling through the {[}code{]} we
-can see that a comparison of byte between the value \texttt{0xe0} (224)
-and the content at address \texttt{0x2410}, if it is not equal the
-program jumps to address login+0x50. In the Debugger Console we type
-\texttt{r login+50} to read the memory at this address. We can see that
-it is indeed the line 4570 of the memory which is our \emph{``That
-password is not correct.''} line.
+can see that a comparison of byte between the value \texttt{0xe0} (224
+in decimal) and the content at address \texttt{0x2410}, if it is not
+equal the program jumps to address login+0x50. In the Debugger Console
+we type \texttt{r login+50} to read the memory at this address. We can
+see that it is indeed the line 4570 of the memory which is our
+\emph{``That password is not correct.''} line.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/3_1.PNG}
-\caption{image}
-\end{figure}
 
 We see that just a few steps ahead, the code sets the byte at
 \texttt{0x2410} to \texttt{0x8e}. That is different from \texttt{0xe0}
@@ -216,7 +205,7 @@ we jump this instruction. That's exactly what is happening if
   eventhough I entered an incorrect password.
 \end{itemize}
 
-So the \texttt{mov.b \#0x8e, \&0x2410} line is just here to confuse.
+So the \texttt{mov.b \#0x8e, \&0x2410} line is just here to confuse us.
 
 \subsection{test\_password\_valid}\label{testux5fpasswordux5fvalid}
 
@@ -254,63 +243,48 @@ of password to reach the next address. In hexadecimal that's two
 letters.
 \end{quote}
 
-Let's try to enter \texttt{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaae0}.
+Let's try to enter \texttt{0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaae0}.
 \textbf{It works!}
 
 \section{Level 5: Cusco}\label{level-5-cusco}
 
-When we entered the level, we are greeted with this a message
-
-\begin{quote}
-\begin{itemize}
-\itemsep1pt\parskip0pt\parsep0pt
-\item
-  We have fixed issues with passwords which may be too long.
-\end{itemize}
-\end{quote}
-
-That's a reference to level 3 :)
+\includegraphics{img/5_1.PNG}
 
 \subsection{Let's start}\label{lets-start}
 
-We see that if we try to enter a long password it stores a maximum of
-48bytes of it in the stack.
-
 \begin{quote}
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+We have fixed issues with passwords which may be too long.
 \end{quote}
 
-We also see that if we continue executing the program with such a long
-password it stops running correctly after line \texttt{453e} which is
-the return instruction \texttt{ret} of the function \texttt{login}. It
-seems we have overwrote the instructions. A quick of the program counter
-(\texttt{r pc 8}) to read the next instruction shows that there are all
-zeros.
+The message greeting us is quickly confirmed by a test. If we try to
+enter a long password it only stores its first 48 bytes in the stack.
 
-The \texttt{ret} instruction of a function takes the last value in stack
-and loads it into the Program Counter \texttt{pc}
+We also see that if we run the program with a long password it stops
+running correctly after a certain line: the return instruction
+\texttt{ret} of the function \texttt{login}. It seems we have overwrote
+the instructions. A quick look at the program counter (\texttt{r pc 8})
+shows that the next instructions are all zeros.
+
+The \texttt{ret} instruction of a function takes the last value in the
+stack and loads it into the Program Counter \texttt{pc}
 (\href{http://en.wikipedia.org/wiki/Program_counter}{also called the
-Instruction Pointer \texttt{ip} in intel x86}). What we did was
-overwriting the stack (\textbf{stack overflow}) and changing the
-\textbf{return value} of the function, which was supposed to be the next
-instruction.
+Instruction Pointer \texttt{ip} in intel x86}).\\What we did was
+overwriting the stack (\textbf{stack overflow}) until it reached what we
+call the \textbf{saved pc} of the function (the instruction that is
+supposed to run after calling the function).
 
 \subsection{Where is the value we have to
 change?}\label{where-is-the-value-we-have-to-change}
 
-Okay, so where exactly is this value we had to change? I will enter
-``password'' as password so I can quickly find it in the memory, and
-break on the \texttt{ret} instruction so I know where in the stack it
-will take its next value (\texttt{b 453e}).
+Okay, so where exactly is this return value we have to change? I will
+enter ``password'' as input so I can quickly find it in the memory. Also
+let's add a breakpoint on the \texttt{ret} instruction and see what is
+the SP (stack pointer) pointing on.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics{img/4_1.PNG}
-\caption{image}
-\end{figure}
+\includegraphics{img/5_2.PNG}
 
 Here we see that \texttt{pc} was pointing to \texttt{453e}, and after
-the return it points to qddress \texttt{443c} in memory, which was
+the return it points to address \texttt{443c} in memory, which was
 indeed the last 16bits entry of the stack, located 8bytes after our
 ``password'' (we can see that in the Live Memory Dump). Now we know that
 if we enter a password where the 16th byte is 0xaabb, the program will
@@ -329,14 +303,15 @@ Let's try with that password:
 
 \section{Level 6: Reykjavik}\label{level-6-reykjavik}
 
-\subsection{Quick look}\label{quick-look}
+\includegraphics{img/6_1.PNG}
+
+\subsection{Observations}\label{observations-2}
 
 We run the program and hodiho! It seems like at one point our
-\texttt{pc} gets lost and doesn't follow the initial path.
+\texttt{pc} gets lost in the stack and doesn't follow the initial path.
 
-Entering a large number of \emph{a} we see that they get stored at
-address \texttt{43da} in memory and that we can enter a maximum of 62
-a's (15bytes + 2 bits).
+Entering a large number of the same letter we see that they get stored
+at address \texttt{43da} in memory.
 
 \subsection{Encryption}\label{encryption}
 
@@ -349,34 +324,35 @@ gives us the hexadecimal code that we can then Disassemble through
 Microcorruption Disassembler, or we can just step through it and observe
 what is really happening through the Current Instruction window.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics{img/5_1.PNG}
-\caption{disassembler}
-\end{figure}
+\includegraphics{img/6_3.PNG}
 
-We step through the code until we get prompted by the pop-up asking for
-a password. We can then check that it gets saved into the stack
-(\texttt{r sp}).
+Let's run the code until we get prompted by the pop-up asking for a
+password. We can then check that it gets saved into the stack
+(\texttt{r sp}). Then let's follow the code step by step with
+\texttt{s}. The PC is now following instructions in the stack (which is
+normally not possible if the system is protected with the NX bit which
+prevents the heap and the stack to be executed).
 
 Right after the popup, this code appears:
 
-\texttt{b490 b26b dcff cmp \#0x6bb2, -0x24(r4)}
+\includegraphics{img/6_2.PNG}
 
 The instruction compares \texttt{0x6bb2} with what is at the address
-pointed by r4, minus 24 bytes. Magically, this where our password is
-stored. Remember, \textbf{the instruction \texttt{cmp} compares 16bits
-in MSP430}, so the password starts like this: \texttt{0xb26b} (remember
-we are in \textbf{little endian}!). Stepping through the code we don't
-see anymore \texttt{cmp}. Let's try this value as a password. \textbf{It
-works!}
+pointed by \texttt{r4}, minus 24 bytes. Magically, this is where our
+password is stored. Remember, \textbf{the instruction \texttt{cmp}
+compares 16bits in MSP430}, so the password starts like this:
+\texttt{0xb26b} (remember we are in \textbf{little endian}!). Stepping
+through the code we don't see anymore \texttt{cmp}. Let's try this value
+as a password. \textbf{It works!}
 
 \section{Level 7: Whitehorse}\label{level-7-whitehorse}
 
-\subsection{Quick look}\label{quick-look-1}
+\includegraphics{img/7_1.PNG}
+
+\subsection{Observations}\label{observations-3}
 
 We quickly test our program and see that we can enter a password of
-maximum 48bytes and that we have a \textbf{stack overflow} after a
+maximum 48 bytes and that we have a \textbf{stack overflow} after a
 length of 16 bytes.
 
 The Program jumps to the address located in the bytes number 17 and 18
@@ -385,48 +361,54 @@ password.
 
 \subsection{Where should we jump?}\label{where-should-we-jump}
 
-The program uses HSM-2 to check the password. We don't have access to
-it. In the LockIT Pro \textbf{Manual} we can read:
+The program uses \textbf{HSM-2} to check the password. We don't have
+access to it. In the \textbf{LockIT Pro Manual} we can read:
 
 \begin{quote}
-\textbf{INT 0x7F.} Interface with deadbolt to trigger an unlock if the
-password is correct. Takes no arguments
+\textbf{INT 0x7F.}\\Interface with deadbolt to trigger an unlock if the
+password is correct.\\Takes no arguments
 \end{quote}
 
-We just have to call an 0x7F interrupt. To tell that to the program we
-have to simulate the \texttt{push \#0x7F} so that the interrupt would
-work.
+We just have to call a \textbf{0x7F interrupt}. To tell that to the
+program we have to simulate the \texttt{push \#0x7F} so that the
+interrupt would work.
 
-If we enter this password: \emph{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa60447f}
+If we enter this password:
+\texttt{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa60447f}
 
-When the \texttt{ret} will occurs, it will put 4460 inside \texttt{pc}
-and points the Stack Pointer \texttt{sp} to the value 7f. That's exactly
-what we want, and it works.
+When the \texttt{ret} will occurs, it will set the Program Counter to
+\texttt{4460} (where the Stack Pointer is). Then the SP will move to the
+value \texttt{7f} which will be taken as an argument when the interrupt
+will happen. That's exactly what we want, and it works.
 
 \section{Level 8: Montevideo}\label{level-8-montevideo}
 
-\subsection{Quick Look}\label{quick-look-2}
+\includegraphics{img/8_1.PNG}
 
-We can enter a 3x16bytes password (same as previous level). The program
-uses strcpy and memset (this is new). We have a stack overflow after 16
-bytes (like the previous level). So let's try entering the exact same
+\subsection{Observations}\label{observations-4}
+
+We can enter a 3x16bytes password (same as previous level).\\The program
+uses strcpy and memset (this is new).\\We have a stack overflow after 16
+bytes (like the previous level).\\So let's try entering the exact same
 password \emph{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa60447f}.
 
 It works\ldots{}
 
-(I think it comes from the use of strcpy, it copies until it finds a \0
-but we can still overflow the stack, buffer overflow, particularly a
-stack overflow. This is stack smashing because we change the RIP (return
-instruction pointer) here maybe it would be called RPC (return program
-counter?))
+(I think it comes from the use of strcpy, it copies until it finds a
+\textbackslash{}0 but we can still overflow the stack, buffer overflow,
+particularly a stack overflow. This is stack smashing because we change
+the RIP (return instruction pointer) here maybe it would be called RPC
+(return program counter?))
 
-(The function copies a supplied string without bounds checking by using
+(The function copies a supplied string without bounds checking by\\using
 strcpy() instead of strncpy().
-(http://insecure.org/stf/smashstack.html))
+(\url{http://insecure.org/stf/smashstack.html}))
 
 \section{Level 9: Johannesburg}\label{level-9-johannesburg}
 
-\subsection{Quick Look}\label{quick-look-3}
+\includegraphics{img/9_2.PNG}
+
+\subsection{Quick Look}\label{quick-look}
 
 There is now a security against passwords that exceed a certain number
 of letters, but the security happens after storing it in stack so we can
@@ -438,16 +420,12 @@ overflow here.
 \subsection{How is the password's length
 checked?}\label{how-is-the-passwords-length-checked}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics{img/8.PNG}
-\caption{password check}
-\end{figure}
+\includegraphics{img/9_1.PNG}
 
 Seems like a password of length superior than 17 bytes is too much, to
 test the security of this it just checks if the value located after the
 17byte password in the stack is 0x7c, a value that is supposed to be
-here. \texttt{cmp.b   \#0x7c, 0x11(sp)}
+here.\\\texttt{cmp.b   \#0x7c, 0x11(sp)}
 
 Here's the trick, if we set the 18th byte of our password to 0x7c then
 it will work!
@@ -455,9 +433,11 @@ it will work!
 We can then jump to the call interrupt and set the last byte of the
 stack to 0x7f like we did in the previous levels:
 
-the password \emph{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa7c6c447f} works.
+the password \texttt{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa7c6c447f} works.
 
 \section{Level 10: Santa Cruz}\label{level-10-santa-cruz}
+
+\includegraphics{img/10_5.PNG}
 
 \subsection{First protection}\label{first-protection}
 
@@ -468,11 +448,7 @@ exits.
 
 \textbf{The r11 register seems to hold the password length.}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/10_1.PNG}
-\caption{image}
-\end{figure}
 
 \texttt{jc} Jump on Carry, similar to Jump if Below (\emph{JB}) or Jump
 if Not Above or Equal (\texttt{JNAE})
@@ -484,11 +460,7 @@ We check this address to see that it's overflowed by the
 \textbf{username} we entered. We can set the 18th byte of the username
 to something lower than the password length and it will pass the test.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/10_2.PNG}
-\caption{image}
-\end{figure}
 
 \begin{quote}
 here I entered a series of \emph{a}'s as username, and a series of
@@ -499,11 +471,7 @@ here I entered a series of \emph{a}'s as username, and a series of
 
 We get kicked a second time but at a different line (45f6).
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/10_3.PNG}
-\caption{second protection}
-\end{figure}
 
 \texttt{jnc} Jump No Carry, equivalent to Jump if Not Below (JNB) or
 \textbf{Jump if Above or Equal} (JAE). So we jump if the byte at address
@@ -520,29 +488,25 @@ characters.
 
 We get halted one last time at line 0x465a.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/10_4.PNG}
-\caption{third protection}
-\end{figure}
 
 \texttt{tst.b -0x6(r4)}: if the byte at address r4 - 6 (\texttt{0x43c6})
-is not zero, it will exit. (canary) It is the 18th byte of the password
-we entered.
+is not zero, it will exit. This is very important as this is one of the
+first occurence of a real world way to prevent attacks on a program. It
+is called a \textbf{Canary}. It checks for values in the code and detect
+buffer overflows if the value is incorrect. Here it checks the byte we
+overflowed with the 18th byte of the password we entered.
 
 Thus, this combination of username and password should pass the three
 tests we described:
-
-username: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01ff password:
-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00bbbbbb {[}\ldots{}{]} bbbb
 
 \subsection{Stack Overflow}\label{stack-overflow}
 
 We passed all the test and couldn't produce a stack overflow with the
 password. Did I miss something? Let's try with the username
 
-username: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01ffaaa {[}\ldots{}{]} aaa
-password: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00
+username: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01ffaaa {[}\ldots{}{]}
+aaa\\password: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00
 
 That's the solution. The Stack Pointer points to some remains of the
 username right before executing the last \texttt{ret} of our program. We
@@ -552,23 +516,21 @@ the address we want to jump to.
 We use the 7F call interrupt technique of the previous challenge.
 
 username:
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01ffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa72447f
-password: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa01ffaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa72447f\\password:
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb00
 
 \textbf{It works!}
 
 \section{Level 11: Jakarta}\label{level-11-jakarta}
 
+\includegraphics{img/11_6.PNG}
+
 \subsection{First protection}\label{first-protection-1}
 
 Entering different usernames we see that \textbf{r11 is the username's
-length}. Look at the instruction \texttt{cmp.b \#0x21, r11}
+length}.\\Look at the instruction \texttt{cmp.b \#0x21, r11}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_1.PNG}
-\caption{first protection}
-\end{figure}
 
 \begin{quote}
 \texttt{jnc} \textasciitilde{} Jump if Above or Equal
@@ -579,33 +541,25 @@ than 33 bytes} (0x21).
 
 \subsection{Second protection}\label{second-protection-1}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_2.PNG}
-\caption{second protection}
-\end{figure}
 
-\texttt{add r11, r15} \texttt{cmp.b \#0x21, r15} \texttt{jnc}
+\begin{verbatim}
+add r11, r15
+cmp.b #0x21, r15
+jnc
+\end{verbatim}
 
 So \textbf{the sum of the username and the password lenghts} have to be
 lesser than 33 bytes as well (0x21).
 
 \subsection{Stack Overflow}\label{stack-overflow-1}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_3.PNG}
-\caption{stack}
-\end{figure}
 
 We see that the username and the password are stored in the stack thanks
 to the \texttt{strcpy}.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_4.PNG}
-\caption{test}
-\end{figure}
 
 We see that the password is tested in the function
 \texttt{test\_username\_and\_password\_valid} through the 7d interrupt.
@@ -614,16 +568,12 @@ overflow again.
 
 But let's go back to our previous tests
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_2.PNG}
-\caption{second protection}
-\end{figure}
 
-Don't you see something? \texttt{cmp.b \#0x21, r15}. This means: compare
-byte of r15 and 0x21. But words are 2 bytes in MSP430 (so registers and
-address in the stack are 2 bytes). What if we wrote 0x1020 for example.
-Would it be lesser than 0x21 ?
+Don't you see something? \texttt{cmp.b \#0x21, r15}.\\This means:
+compare byte of r15 and 0x21. But words are 2 bytes in MSP430 (so
+registers and address in the stack are 2 bytes).\\What if we wrote
+0x1020 for example. Would it be lesser than 0x21 ?
 
 Let's try that.
 
@@ -642,11 +592,7 @@ overwrote the return address.
 Breaking on the return instruction we can see at what address the Saved
 PC is (at the SP address).
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/11_5.PNG}
-\caption{seip}
-\end{figure}
 
 So we can enter our personalized return address at the byte number 5 and
 6 of our password (if our username is of length 0x20 of course). Let's
@@ -658,11 +604,7 @@ So entering the same username, and this as password works:
 
 \section{Level 12: Addis Ababa}\label{level-12-addis-ababa}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/12_1.PNG}
-\caption{addis ababa}
-\end{figure}
 
 \subsection{Quick observations}\label{quick-observations}
 
@@ -687,21 +629,13 @@ So entering the same username, and this as password works:
 
 \subsection{Printf in Manual}\label{printf-in-manual}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/12_2.PNG}
-\caption{printf}
-\end{figure}
 
 We see that printf is a limited version of the C equivalent. Since we
 have \%n available we know we can write to the memory and thus we should
 be able to do a Format String exploit.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/12_3.PNG}
-\caption{printf}
-\end{figure}
 
 So here the developer did a:
 
@@ -728,9 +662,9 @@ our second arguments we are pointing to the beginning of our input.
 Since a word is 16bits in MSP430 we only display 2 characters in
 hexadecimal.
 
-So if we enter \texttt{PTR\%x\%n} we will write 5 to the address in PTR.
-note that we can use \%x, \%c, \%n\ldots{} as our first format since we
-won't use it.
+So if we enter \texttt{PTR\%x\%n} we will write 5 to the address in
+PTR.\\note that we can use \%x, \%c, \%n\ldots{} as our first format
+since we won't use it.
 
 \subsection{Exploit}\label{exploit}
 
@@ -740,11 +674,7 @@ Remember what we observed at the begginning:
 If the SP is different from zero the program unlocks the doors.
 \end{quote}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/12_5.PNG}
-\caption{final}
-\end{figure}
 
 It was at this line. And by breaking on it we can see that sp is
 pointing to 3062.
@@ -756,13 +686,9 @@ which should write the number of characters printed before the last \%n
 
 \section{Level 13: Novosibirsk}\label{level-13-novosibirsk}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/13_1.PNG}
-\caption{Novosibirsk}
-\end{figure}
 
-\subsection{Observations}\label{observations}
+\subsection{Observations}\label{observations-5}
 
 \begin{itemize}
 \itemsep1pt\parskip0pt\parsep0pt
@@ -780,30 +706,30 @@ which should write the number of characters printed before the last \%n
 The obvious idea here is to change the 7E interrupt to a 7F interrupt.
 Let's try the to exploit the Format String to do that.
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/13_2.PNG}
-\caption{interrupt}
-\end{figure}
 
-So let's build our input: * the address we want to write on (here
-\texttt{c844} (little endian)). * Then enough padding to print 7f (127)
-bytes including the 4 bytes of the address we're writing on. * The
-format \%n
+So let's build our input:
 
-c8446161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161256e
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  the address we want to write on (here \texttt{c844} (little endian)).
+\item
+  Then enough padding to print 7f (127) bytes including the 4 bytes of
+  the address we're writing on.
+\item
+  The format \%n
+\end{itemize}
+
+\texttt{c8446161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161256e}
 
 This works.
 
 \section{Level 14: Algiers}\label{level-14-algiers}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/14_1.PNG}
-\caption{algiers}
-\end{figure}
 
-\subsection{Observations}\label{observations-1}
+\subsection{Observations}\label{observations-6}
 
 \begin{itemize}
 \itemsep1pt\parskip0pt\parsep0pt
@@ -828,11 +754,7 @@ This works.
   function).
 \end{itemize}
 
-\begin{figure}[htbp]
-\centering
 \includegraphics{img/14_2.PNG}
-\caption{observations}
-\end{figure}
 
 In the Manual we find:
 
@@ -841,9 +763,161 @@ BIT arg1 arg2 -\textgreater{} compute arg1 \& arg1, set the flags, and
 discard the results (like TEST on x86)
 \end{quote}
 
-\subsection{test\_password\_valid}\label{testux5fpasswordux5fvalid-1}
+Also it seems good to keep being aware that in MSP430 the Heap grows
+toward the Stack and the Stack towards the Heap.
 
-There is a ret at the beggining of the function. Followed by a lot of
-strange functions (hints at ROP?)
+0000 low addresses\\HEAP v
 
-\end{document}
+STACK \^{}\\Text v\\ffff high addresses
+
+\subsection{login}\label{login}
+
+\includegraphics{img/14_3.PNG}
+
+Looking at the login function we see that it's doing two malloc of size
+10 and is storing the username in the first malloc contained at r10, and
+the password in the second malloc r11.
+
+After retrieving the user's credentials and storing them in the heap.
+The program calls \texttt{test\_password\_valid} and unlocks the door or
+not according to the validity of the username and the password.
+
+Looking at the test\_password\_valid we see an early \texttt{ret}
+followed by a long list of what seems like gibberish opcodes.
+
+\includegraphics{img/14_4.PNG}
+
+Later the login function frees the two mallocs.
+
+But let's see what really happens. We can see the heap before the
+mallocs:
+
+\includegraphics{img/14_5.PNG}
+
+The heap after the first malloc:
+
+\includegraphics{img/14_6.PNG}
+
+The heap after the second malloc:
+
+\includegraphics{img/14_7.PNG}
+
+The heap after entering ``username'' as username:
+
+\includegraphics{img/14_8.PNG}
+
+The heap after entering ``password'' as password:
+
+\includegraphics{img/14_9.PNG}
+
+Here we can see the memory after the first free:
+
+\includegraphics{img/14_10.PNG}
+
+And the memory after the second free:
+
+\includegraphics{img/14_11.PNG}
+
+\subsection{Heap Structure.}\label{heap-structure.}
+
+\includegraphics{img/14_9.PNG}
+
+The Heap is a \textbf{doubly-linked list}. Each chunk is composed of
+\textbf{metadatas} and a \textbf{payload}. The chunks are wraped with a
+heap header and a heap footer. Here we can see the structure of a
+chunck:
+
+\begin{verbatim}
+0824 | 1e24 | 21 00 | username | 00...
+ bk  |  fw  | flag  | payload  | padding
+\end{verbatim}
+
+And what is interesting:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  bk (backward): a pointer to the previous chunck
+\item
+  fw (forward): a pointer to the next chunck
+\end{itemize}
+
+The second chunck starts at address \texttt{241e} and contains the
+password. The idea of a heap overflow is to \textbf{overwrite the
+metadatas} of this second chunck when filling the payload of the first
+one. Because when free is called to remove this chunck, it will do some
+magic with the fw and bk pointers so the chain can reconstruct around
+the chunck.
+
+\subsection{Try to exploit this}\label{try-to-exploit-this}
+
+So let's change overwrite the second chunck with our username input. I
+tried multipled things:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  Set fw to the saved pc in the stack right before the return of the
+  login function, set bk to the address where login calls unlock\_door.
+\item
+  Set fw to the address being called in the second free, set bw to the
+  unlock\_door function.
+\item
+  Set fw to the instruction return in the free function, set bw to Nops
+  so we would go directly in the unlock\_door function afterwards.
+\end{itemize}
+
+It failed for different reasons. It was overwritting things at the bw
+pointer. It was not working because of parity problems. Reversing the
+function did help understand that what we would point with fw would
+influence the overwriting.
+
+Here is a smart reverse of the function \texttt{free}. It was thought so
+I could see how changing bk, fw and the flag would influence the free.
+So this is not exactly what the free function does! I also remove
+useless lines.
+
+\begin{verbatim}
+exploitable_free(*bk, *fw, *flag){
+    // the flag is modified if not even
+    if(*flag % 2 == 1)
+        *flag = *flag - 1;
+    r14 = bk;
+    r12 = *(bk + 4);
+
+    // we do this if the previous chunk's flag is even
+    // which is not because it's not the first one?
+    if(r12 % 2 == 0){
+        // not executed
+    }
+
+    r14 = fw;
+    r13 = *(fw+4);
+
+    // r13 : 1f9c (dunno if we can rewrite that far away)
+    // c : 1100
+    // so we do this if
+    if(r13 % 2 == 0){
+        *flag = r13 + *flag + 6;
+        fw = *(r14+2); // interesting!
+        *fw = bk;
+    }
+
+    return;
+}
+\end{verbatim}
+
+In the end I tried to make a shell code. I copied the instructions in
+unlock\_door:
+
+\begin{verbatim}
+3012 7f00 b012 b646 fd3f
+\end{verbatim}
+
+And I pointed the saved pc to the heap (which is supposed to be
+non-executable on a protected system but here it worked!).
+
+Also, to counter the overwritting problem I made a NOP slide. Here's the
+solution:
+
+\texttt{909090909090 3012 7f00 b012 b646 fd3f 0e24 9a43}
