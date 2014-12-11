@@ -121,33 +121,7 @@ code execution. But we'll only work with register for this second level.
 Here's what the code would do if disassembled in a language more
 familiar (that looks like C):
 
-\begin{verbatim}
-function check_password:
-
-r14 = 0; // clr r14
-r13 = r15; // mov r15, r13
-r13 += r14; // add r14, 13
-// cmp.b @r13, 0x2400 and jne #0x44d2
-// we compare only one byte and not an entire word
-if(*r13 & 0x01 == *(0x2400 + r14) & 0x01)
-{
-    r14++; // inc r14
-    // cmp #0x8, r14 and jne #0x44be
-    // here we use cmp and not cmp.b so we compare an entire word (16 bits in MSP430)
-    if(r14 != 8)
-    { 
-        goto check_password + 2; // go back to the mov r13 = r15 line
-    }
-    else
-    {
-        r15 = 1; // mov #0x1, r15
-        return; // ret
-    }
-}
-
-r15 = 0; // clr r15
-return; // ret
-\end{verbatim}
+\includegraphics{img/code1_final.PNG}
 
 \begin{quote}
 So we compare one byte of what's in r13 with one byte of what's in
@@ -935,35 +909,7 @@ I could see how changing bk, fw and the flag would influence the free.
 So this is not exactly what the free function does! I also remove
 useless lines.
 
-\begin{verbatim}
-exploitable_free(*bk, *fw, *flag){
-    // the flag is modified if not even
-    if(*flag % 2 == 1)
-        *flag = *flag - 1;
-    r14 = bk;
-    r12 = *(bk + 4);
-
-    // we do this if the previous chunk's flag is even
-    // which is not because it's not the first one?
-    if(r12 % 2 == 0){
-        // not executed
-    }
-
-    r14 = fw;
-    r13 = *(fw+4);
-
-    // r13 : 1f9c (dunno if we can rewrite that far away)
-    // c : 1100
-    // so we do this if
-    if(r13 % 2 == 0){
-        *flag = r13 + *flag + 6;
-        fw = *(r14+2); // interesting!
-        *fw = bk;
-    }
-
-    return;
-}
-\end{verbatim}
+\includegraphics{img/code2_final.PNG}
 
 In the end I tried to make a shell code. I copied the instructions in
 unlock\_door:
